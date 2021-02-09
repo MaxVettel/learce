@@ -5,6 +5,12 @@ import java.util.function.Consumer;
 
 public class Channel {
 
+    private Connection connection;
+
+    public Channel(Connection connection) {
+        this.connection = connection;
+    }
+
     public void sendMessage(String queueName, String message) {
 
     }

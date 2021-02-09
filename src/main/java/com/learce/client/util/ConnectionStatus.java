@@ -1,6 +1,6 @@
 package com.learce.client.util;
 
-public enum ConnectionState {
+public enum ConnectionStatus {
 
     NEW,
     START_OK,
