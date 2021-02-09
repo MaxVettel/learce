@@ -4,8 +4,11 @@ import com.learce.client.util.ConnectionChannel;
 import com.learce.client.util.ConnectionStatus;
 
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Connection {
+
+    private static AtomicInteger channelNumber = new AtomicInteger(1);
 
     private final Socket socket;
     private ConnectionStatus connectionStatus;
@@ -18,7 +21,11 @@ public class Connection {
     }
 
     public Channel createChannel() {
-        return new Channel(this);
+        return new Channel(this, getNextChannelNumber());
+    }
+
+    public int getNextChannelNumber() {
+        return channelNumber.getAndIncrement();
     }
 
     public void start() {

@@ -8,7 +8,7 @@ public class ConnectionChannel extends Channel {
     public static final String HEADER = "AMQP 0.0.9.1";
 
     public ConnectionChannel(Connection connection) {
-        super(connection);
+        super(connection, 0);
     }
 
     public void startConnection() {
