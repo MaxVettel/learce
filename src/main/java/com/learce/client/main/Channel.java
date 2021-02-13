@@ -1,5 +1,7 @@
 package com.learce.client.main;
 
+import com.learce.client.util.Frame;
+
 import java.util.function.Consumer;
 
 public class Channel {
@@ -10,6 +12,13 @@ public class Channel {
     public Channel(Connection connection, int channelNumber) {
         this.connection = connection;
         this.channelNumber = channelNumber;
+    }
+
+    //todo: добавь equals и hashcode так как каналы используются в hashmap в классе Connection
+    protected Runnable handleFrame(Frame frame) {
+        return () -> {
+
+        };
     }
 
     public void sendMessage(String queueName, String message) {
