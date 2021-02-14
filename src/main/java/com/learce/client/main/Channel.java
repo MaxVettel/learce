@@ -15,10 +15,8 @@ public class Channel {
     }
 
     //todo: добавь equals и hashcode так как каналы используются в hashmap в классе Connection
-    protected Runnable handleFrame(Frame frame) {
-        return () -> {
+    protected void handleFrame(Frame frame) {
 
-        };
     }
 
     public void sendMessage(String queueName, String message) {

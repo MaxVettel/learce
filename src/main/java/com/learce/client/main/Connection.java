@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class Connection {
 
+    /* The channel number is 0 for all frames which are global to the connection and 1-65535 for frames that refer to specific channels. */
     private AtomicInteger channelNumberSequence = new AtomicInteger(1);
 
     private final Socket socket;
@@ -82,7 +83,7 @@ public class Connection {
                     Frame inputFrame = inputFrames.take();
                     int channelNumber = inputFrame.getChannel();
                     Channel channel = channels.get(channelNumber);
-                    channelExecutor.execute(channel.handleFrame(inputFrame));
+                    channelExecutor.execute(() -> channel.handleFrame(inputFrame));
                 }
             } catch (InterruptedException exception) {
                 //todo: handle exception
@@ -115,7 +116,8 @@ public class Connection {
 
         int frameEndMarker = inputStream.readUnsignedByte();
         if (frameEndMarker != AMQP.FRAME_END) {
-            //todo: throw Exception
+            //todo: If the frame-end is not valid it MUST treat this as a fatal protocol error and close the
+            //connection without sending any further data on it.
         }
         return new Frame(type, channel, payloadSize, payload);
     }
