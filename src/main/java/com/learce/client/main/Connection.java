@@ -107,6 +107,11 @@ public class Connection {
         }
     }
 
+    protected void addFrameToSend(Frame frame) throws InterruptedException {
+        //todo: НУЖНО ЛИ СИНХРОНИЗИРОВАТЬСЯ???
+        outputFrames.put(frame);
+    }
+
     private synchronized Frame readFrame(DataInputStream inputStream) throws IOException {
         int type = inputStream.readUnsignedByte();
         int channel = inputStream.readUnsignedShort();

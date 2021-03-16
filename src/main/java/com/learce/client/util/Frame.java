@@ -1,5 +1,8 @@
 package com.learce.client.util;
 
+import lombok.Getter;
+
+@Getter
 public class Frame {
 
     private final int type;
@@ -17,17 +20,5 @@ public class Frame {
     //todo: add lombok
     public int getType() {
         return type;
-    }
-
-    public int getChannel() {
-        return channel;
-    }
-
-    public int getSize() {
-        return size;
-    }
-
-    public byte[] getPayload() {
-        return payload;
     }
 }
