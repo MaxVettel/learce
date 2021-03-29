@@ -36,6 +36,7 @@ public class Connection {
         int channelNumber = getNextChannelNumber();
         Channel channel = new Channel(this, channelNumber);
         channels.put(channelNumber,channel);
+        channel.start();
         return channel;
     }
 
@@ -85,7 +86,7 @@ public class Connection {
                     Frame inputFrame = inputFrames.take();
                     int channelNumber = inputFrame.getChannel();
                     Channel channel = channels.get(channelNumber);
-                    channelExecutor.execute(() -> channel.handleFrame(inputFrame));
+                    channel.addFrameToQueue(inputFrame);
                 }
             } catch (InterruptedException exception) {
                 //todo: handle exception

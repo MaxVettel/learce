@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 public class Channel {
@@ -23,6 +23,8 @@ public class Channel {
     private Integer syncMethodId;
     private ChannelStatus channelStatus;
     private final ConcurrentHashMap<String, Consumer<String>> consumerTags;
+    private final ExecutorService channelMainThread = Executors.newSingleThreadExecutor();
+    private final BlockingQueue<Frame> frameQueue = new LinkedBlockingQueue<>();
 
     public Channel(Connection connection, int channelNumber) {
         this.connection = connection;
@@ -30,6 +32,35 @@ public class Channel {
         this.command = new Command();
         this.syncMethodId = null;
         this.consumerTags = new ConcurrentHashMap<>();
+    }
+
+    void start() {
+        //todo: добавить изменение статуса канала
+        Runnable channelMainLoop = () -> {
+            try {
+                while(channelStatus != ChannelStatus.CLOSED) {
+                    Frame inputFrame = frameQueue.take();
+                    handleFrame(inputFrame);
+                }
+            } catch (InterruptedException e) {
+                //handle exception
+            } finally {
+                close();
+            }
+        };
+        channelMainThread.execute(channelMainLoop);
+    }
+
+    void close() {
+
+    }
+
+    void addFrameToQueue(Frame frame) {
+        try {
+            frameQueue.put(frame);
+        } catch (InterruptedException exception) {
+            //handle exception
+        }
     }
 
     /**
