@@ -16,9 +16,4 @@ public class Frame {
         this.size = size;
         this.payload = payload;
     }
-
-    //todo: add lombok
-    public int getType() {
-        return type;
-    }
 }

@@ -78,6 +78,8 @@ public class Connection {
             }
         };
         Runnable frameHandler = () -> {
+            //todo: ПЕРЕДЕЛАТЬ ЛОГИКУ РАСКИДЫВАНИЯ ФРЕЙМОВ ПО КАНАЛАМ
+            //В КАНАЛЫ НУЖНО ДОБАВИТЬ ОЧЕРЕДЬ, ЧТОБЫ ФРЕЙМЫ ОБРАБАТЫВАЛИСЬ ПОСЛЕДОВАТЕЛЬНО
             try {
                 while (this.connectionStatus != ConnectionStatus.CLOSE_OK) {
                     Frame inputFrame = inputFrames.take();
@@ -107,12 +109,16 @@ public class Connection {
         }
     }
 
-    protected void addFrameToSend(Frame frame) throws InterruptedException {
-        //todo: НУЖНО ЛИ СИНХРОНИЗИРОВАТЬСЯ???
-        outputFrames.put(frame);
+    protected void addFrameToSend(Frame frame) {
+        try {
+            outputFrames.put(frame);
+        } catch (InterruptedException exception) {
+            //handle exception
+        }
     }
 
     private synchronized Frame readFrame(DataInputStream inputStream) throws IOException {
+        //todo: check frame size
         int type = inputStream.readUnsignedByte();
         int channel = inputStream.readUnsignedShort();
         int payloadSize = inputStream.readInt();
@@ -133,6 +139,6 @@ public class Connection {
         outputStream.writeShort(frame.getChannel());
         outputStream.writeInt(frame.getSize());
         outputStream.write(frame.getPayload());
-        outputStream.write(AMQP.FRAME_END);
+        outputStream.writeByte(AMQP.FRAME_END);
     }
 }

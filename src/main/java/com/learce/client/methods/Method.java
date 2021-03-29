@@ -1,7 +1,6 @@
-package com.learce.client.util;
+package com.learce.client.methods;
 
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 
 public abstract class Method {
 
@@ -13,5 +12,5 @@ public abstract class Method {
 
     public abstract void readArguments(DataInputStream inputStream);
 
-    public abstract void writeArguments(DataOutputStream outputStream);
+    public abstract byte[] writeArguments();
 }

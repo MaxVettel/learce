@@ -1,6 +1,8 @@
 package com.learce.client.classes;
 
-import com.learce.client.util.Method;
+import com.learce.client.methods.ConsumeMethod;
+import com.learce.client.methods.Method;
+import com.learce.client.methods.PublishMethod;
 
 public class AmqpClass {
 
@@ -9,7 +11,11 @@ public class AmqpClass {
         return null;
     }
 
-    public static Method getPublishMethod() {
+    public static PublishMethod getPublishMethod() {
+        return null;
+    }
+
+    public static ConsumeMethod getConsumeMethod() {
         return null;
     }
 

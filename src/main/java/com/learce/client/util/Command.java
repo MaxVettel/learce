@@ -1,5 +1,6 @@
 package com.learce.client.util;
 
+import com.learce.client.methods.Method;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -7,7 +8,7 @@ import lombok.Setter;
 @Setter
 public class Command {
 
-    private CommandStatus commandStatus;
+    private volatile CommandStatus commandStatus;
 
     private Method method;
     private ContentHeader contentHeader;

@@ -1,11 +1,18 @@
 package com.learce.client.main;
 
 import com.learce.client.classes.AmqpClass;
+import com.learce.client.methods.ConsumeMethod;
+import com.learce.client.methods.Method;
+import com.learce.client.methods.PublishMethod;
 import com.learce.client.util.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class Channel {
@@ -15,12 +22,14 @@ public class Channel {
     private Command command;
     private Integer syncMethodId;
     private ChannelStatus channelStatus;
+    private final ConcurrentHashMap<String, Consumer<String>> consumerTags;
 
     public Channel(Connection connection, int channelNumber) {
         this.connection = connection;
         this.channelNumber = channelNumber;
         this.command = new Command();
         this.syncMethodId = null;
+        this.consumerTags = new ConcurrentHashMap<>();
     }
 
     /**
@@ -71,15 +80,14 @@ public class Channel {
             int methodId = payload.readUnsignedShort();
             //check that channel doesn't expect any answer from sync method
             if (syncMethodId != null) {
-                if (methodId == syncMethodId) {
-                    syncMethodId = null;
-                } else {
+                if (syncMethodId != methodId) {
                     //throw exception
                 }
             }
-            Method method = getMethod(classId, methodId);
+            Method method = AmqpClass.getMethod(classId, methodId);
             method.readArguments(payload);
             command.setMethod(method);
+            syncMethodId = method.getSyncMethodId();
 
             if (method.hasContextHeader()) {
                 command.setCommandStatus(CommandStatus.EXPECTING_CONTENT_HEADER);
@@ -107,17 +115,26 @@ public class Channel {
             ContentHeader contentHeader = new ContentHeader(bodySize);
             contentHeader.readProperties(payload);
             command.setContentHeader(contentHeader);
+            if (bodySize != 0) {
+                command.setCommandStatus(CommandStatus.EXPECTING_CONTENT_BODY);
+            } else {
+                command.setCommandStatus(CommandStatus.COMPLETE);
+                handleCompleteCommand(command);
+            }
         }
     }
 
     protected void handleBodyFrame(DataInputStream payload) throws IOException {
         synchronized (command) {
             ContentHeader contentHeader = command.getContentHeader();
+            long bodySize = contentHeader.getBodySize();
+            //todo: ДОБАВИТЬ ОБРАБОТКУ НЕСКОЛЬКИХ ПОСЛЕДОВАТЕЛЬНЫХ ФРЕЙМОВ
             if (contentHeader != null) {
                 contentHeader.readContentBody(payload);
             } else {
                 //throw exception
             }
+            //todo: ДОБАВИТЬ ОБНОВЛЕНИЕ СТАТУСА КОМАНДЫ
         }
     }
 
@@ -126,35 +143,75 @@ public class Channel {
         if (channelNumber != 0 && classId == AMQP.CONNECTION_CLASS) {
             //throw exception
         }
-    }
-
-    private Method getMethod(int classId, int methodId) {
-        return AmqpClass.getMethod(classId, methodId);
+        //todo: обработка фрейма
     }
 
     private void handleCompleteCommand(Command command) {
-        sendCommand(command);
-    }
-
-    private Frame commandToFrame(Command command) {
-        return  null;
-    }
-
-    private void sendCommand(Command command) {
-        try {
-            Frame frame = commandToFrame(command);
-            connection.addFrameToSend(frame);
-        } catch (InterruptedException e) {
-            //handle exception
-            //this point could be potential extention for recovery channel
+        //no synchronization because not only channel command could be handled
+        //but also client command (publish or consume)
+        if (command.getCommandStatus() == CommandStatus.COMPLETE) {
+            List<Frame> frames = commandToFrames(command);
+            frames.forEach(frame -> connection.addFrameToSend(frame));
+        } else {
+            //throw exception
         }
     }
 
-    public void sendMessage(String queueName, String message) {
+    private List<Frame> commandToFrames(Command command) {
+        ArrayList<Frame> frames = new ArrayList<>();
+        Method method = command.getMethod();
+        byte[] methodPayload = method.writeArguments();
+        Frame methodFrame = new Frame(AMQP.METHOD_FRAME, channelNumber, methodPayload.length, methodPayload);
+        frames.add(methodFrame);
+        if (method.hasContextHeader()) {
+            ContentHeader contentHeader = command.getContentHeader();
+            byte[] headerPayload = contentHeader.writeProperties();
+            Frame headerFrame = new Frame(AMQP.HEADER_FRAME, channelNumber, headerPayload.length, headerPayload);
+            frames.add(headerFrame);
+            long bodySize = contentHeader.getBodySize();
+            //Если в bodySize есть контент, то его нужно записать в ContentBody фреймы
+            if (bodySize != 0) {
+                byte[] contentPayload = contentHeader.getContentBody();
+                //Сначала ищем количество полноразмерный фреймов, так как минимальный размер фрейма задан
+                int contentFramesNumber = (int) bodySize/AMQP.FRAME_PAYLOAD_MIN_SIZE;
+                for (int i = 0; i < contentFramesNumber; i++) {
+                    int rangeFrom = i * AMQP.FRAME_PAYLOAD_MIN_SIZE;
+                    int rangeTo = rangeFrom + AMQP.FRAME_PAYLOAD_MIN_SIZE;
+                    byte[] contentPayloadPart = Arrays.copyOfRange(contentPayload, rangeFrom, rangeTo);
+                    Frame contentFrame = new Frame(AMQP.BODY_FRAME, channelNumber, contentPayloadPart.length, contentPayloadPart);
+                    frames.add(contentFrame);
+                }
+                //Если bodySize подразумевает в конце обрезанный фрейм, то обрабатываем его
+                int contentPayloadRest = (int) bodySize - contentFramesNumber * AMQP.FRAME_PAYLOAD_MIN_SIZE;
+                if (contentPayloadRest != 0) {
+                    int rangeFrom = contentFramesNumber * AMQP.FRAME_PAYLOAD_MIN_SIZE;
+                    int rangeTo = rangeFrom + contentPayloadRest;
+                    byte[] contentPayloadPart = Arrays.copyOfRange(contentPayload, rangeFrom, rangeTo);
+                    Frame contentFrame = new Frame(AMQP.BODY_FRAME, channelNumber, contentPayloadPart.length, contentPayloadPart);
+                    frames.add(contentFrame);
+                }
+            }
+        }
+        return frames;
+    }
 
+    public void sendMessage(String queueName, String message) {
+        PublishMethod publishMethod = AmqpClass.getPublishMethod();
+        Command command = new Command();
+        publishMethod.publish(queueName, message);
+        handleCompleteCommand(command);
     }
 
     public void publishMessageReceiver(String queueName, Consumer<String> messageHandler) {
+        publishMessageReceiver(queueName, messageHandler, "");
+    }
 
+    public void publishMessageReceiver(String queueName, Consumer<String> messageHandler, String consumerTag) {
+        if (consumerTag == null || consumerTag.isEmpty()) {
+
+        }
+        ConsumeMethod consumeMethod = AmqpClass.getConsumeMethod();
+        String message = consumeMethod.consume(queueName);
+        messageHandler.accept(message);
     }
 }
